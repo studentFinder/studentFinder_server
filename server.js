@@ -8,7 +8,7 @@ const port = 3000
 
 //FAKE DATABASE
 var userNum = 0;
-var users = [];
+var users = []; //[email,password,username,name]
 
 var departments = [null,"COSC","PSYO"]
 var courses = [{name: "COSC 101", studentsIn: []},
@@ -79,15 +79,15 @@ function getUsersInCourse(courseId){
     return courses[courseId].studentsIn
 }
 
-function signup(username,password,res){
+function signup(email,password,username,name,res){
     //SELECT * FROM users WHERE username = usernameparam AND password = passwordpaaram
     //if user exists then dont make new user act
     //INSERT INTO users (username,password) VALUES (username, password)
     var generatedId = userNum; // get from database
     userNum++
     var token = createJwtToken(generatedId)
-    users.push([username,password])
-    res.status(201).json({ token, username, userId: generatedId });
+    users.push([email,password,username,name])
+    res.status(201).json({ token, email, userId: generatedId, success: true });
 }
 
 function findAccount(email,password){
@@ -113,57 +113,64 @@ app.post('/signup', (req,res) => {
     console.log(req.body)
     let email = req.body.email;
 	let password = req.body.password;
+    let username = req.body.username
+    let name = req.body.name;
     var valid = false;
 
-    if(email.length > 1 && password.length > 1){
+    if(email.length > 1 && password.length > 1 && name.length > 1 && username.length > 1){
         if(email.includes('ubc')){
             valid = true;
         }
     }
 
     if(valid){
-        signup(email,password,res)
+        signup(email,password,username,name,res)
     } else {
-        res.send("Invalid email or password")
+        res.status(201).json({success: false});
     }
 })
 
 //search by coursename and/or deptId
 app.get('/courses', (req, res) => {
-    var out = "";
+    var out = {
+        courses:[]
+    };
     var courses = getCourses(req.query.search,req.query.deptId)
     for(var i = 0; i < courses.length; i++){
-        out += courses[i].name + " "
+        out.courses.push({"courseName": courses[i].name, "numberStudents": courses[i].studentsIn.length})
     }
-    res.send(out);
+    res.status(201).json(out);
   })
 
 
 app.get('/departments/:deptId', (req,res) => {
     var deptId = req.params.deptId;
     var search = req.query.search
-    var out = "";
+    var out = {
+        courses:[]
+    };
     var courses = getCourses(search,deptId)
     for(var i = 0; i < courses.length; i++){
-        out += courses[i].name + " "
+        out.courses.push({"courseName": courses[i].name, "numberStudents": courses[i].studentsIn.length})
     }
-    res.send(out)
+    res.status(201).json(out);
 })
 
 app.get('/course/:courseId', (req,res) => {
     var courseId = req.params.courseId;
     var users = getUsersInCourse(courseId)
     //SELECT * FROM users WHERE courseId = courseId
-    var usersString = ""
+    var out = {
+        users:[]
+    };
+
     if(courseId){
         for (let index = 0; index < courses[courseId].studentsIn.length; index++) {
             const user = courses[courseId].studentsIn[index];
-            usersString += user[0] + " "
-            
+            out.users.push({"userId": user[0], "username": user[2], "name": user[3]})
         }
-        res.send("people in: " + courses[courseId].name + ", " + usersString)
     }
-    res.end()
+    res.status(201).json(out);
 })
 
 app.post('/join', (req,res) => {
@@ -174,9 +181,9 @@ app.post('/join', (req,res) => {
     var user = users[userId]
     if(course != null && user != null){
         course.studentsIn.push(user)
-        res.send("success")
+        res.status(201).json({success:true});
     } else {
-        res.send("invalid course or user");
+        res.status(201).json({success:false, message:"Invalid courseID or userID"});
     }
     //SELECT * FROM users WHERE courseId = courseId
     res.end()
